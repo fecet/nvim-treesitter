@@ -275,8 +275,14 @@ end
 -- Set visual selection to node
 -- @param selection_mode One of "charwise" (default) or "v", "linewise" or "V",
 --   "blockwise" or "<C-v>" (as a string with 5 characters or a single character)
-function M.update_selection(buf, node, selection_mode)
-  local start_row, start_col, end_row, end_col = M.get_vim_range({ ts.get_node_range(node) }, buf)
+function M.update_selection(buf, node_or_range, selection_mode)
+  local start_row, start_col, end_row, end_col
+
+  if type(node_or_range) == "table" then
+    start_row, start_col, end_row, end_col = unpack(node_or_range)
+  else
+    start_row, start_col, end_row, end_col = M.get_vim_range({ ts.get_node_range(node_or_range) }, buf)
+  end
 
   local v_table = { charwise = "v", linewise = "V", blockwise = "<C-v>" }
   selection_mode = selection_mode or "charwise"

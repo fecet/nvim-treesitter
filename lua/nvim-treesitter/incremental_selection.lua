@@ -11,11 +11,28 @@ local M = {}
 ---@type table<integer, table<TSNode|nil>>
 local selections = {}
 
+local function inner_node(node, buf)
+  local srow, scol, erow, ecol = ts_utils.get_vim_range { node:range() }
+  local node_text = vim.treesitter.get_node_text(node, buf)
+  local node_has_brackets = string.match(node_text, "^%b{}$") or string.match(node_text, "^%b()$")
+  if node_has_brackets then
+    -- Trim leading and trailing brackets
+    scol = scol + 1
+    ecol = ecol - 1
+  end
+  return node_has_brackets, srow, scol, erow, ecol
+end
+
 function M.init_selection()
   local buf = api.nvim_get_current_buf()
   local node = ts_utils.get_node_at_cursor()
-  selections[buf] = { [1] = node }
-  ts_utils.update_selection(buf, node)
+  local node_has_brackets, srow, scol, erow, ecol = inner_node(node, buf)
+
+  if node_has_brackets == nil then
+    selections[buf] = { [1] = node }
+  end
+
+  ts_utils.update_selection(buf, { srow, scol, erow, ecol })
 end
 
 -- Get the range of the current visual selection.
@@ -87,13 +104,24 @@ local function select_incremental(get_parent)
         end
       end
       node = parent
-      local srow, scol, erow, ecol = ts_utils.get_vim_range { node:range() }
+      local node_has_brackets, srow, scol, erow, ecol = inner_node(node, buf)
       local same_range = (srow == csrow and scol == cscol and erow == cerow and ecol == cecol)
-      if not same_range then
+      -- print(srow, scol, erow, ecol)
+      -- print(csrow, cscol, cerow, cecol)
+      -- print(same_range)
+      -- print(node_has_brackets)
+
+      if not same_range or node_has_brackets then
         table.insert(selections[buf], node)
         if node ~= nodes[#nodes] then
           table.insert(nodes, node)
         end
+      end
+
+      if not same_range then
+        ts_utils.update_selection(buf, { srow, scol, erow, ecol })
+        return
+      elseif node_has_brackets then
         ts_utils.update_selection(buf, node)
         return
       end
